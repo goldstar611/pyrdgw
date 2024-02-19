@@ -1,17 +1,10 @@
 {
-    "gw_server": {
-        "hostname": "gabriel.com",
-        "port": "443",
-        "cert_path": "d:/certs/gabriel.com.crt",
-        "key_path": "d:/certs/gabriel.com.key"
-    },
-
     "websocket_server": {
-        "hostname": "gabriel.com",
+        "hostname": "127.0.0.1",
         "port": "8443",
-        "cert_path": "d:/certs/gabriel.com.crt",
-        "key_path": "d:/certs/gabriel.com.key",
-        "ca_path": "d:/certs/myCA.pem"
+        "cert_path": "server.crt",
+        "key_path": "server.key",
+        "ca_path": "server.crt"
     },
 
     "logging": {

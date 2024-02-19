@@ -19,7 +19,6 @@ class ReadableStream:
         self.buf = self.buf[2:]
         return result
 
-
     def peek_uint16(self) -> int:
         assert len(self.buf) >= 2
         result = struct.unpack('<H', self.buf[0:2])[0]

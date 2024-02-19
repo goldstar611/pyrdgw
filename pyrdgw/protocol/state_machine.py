@@ -5,11 +5,9 @@ from pyrdgw.protocol.serializer import *
 from pyrdgw.protocol.messages import *
 from pyrdgw.log_messages import *
 
-import websockets
-import sys
-import threading
 import asyncio
 import logging
+from typing import Union
 
 
 class ProtocolStateMachine:
@@ -25,13 +23,12 @@ class ProtocolStateMachine:
         self.state: ProtocolState = ProtocolState.INITIAL
         self.parser = ProtocolParser()
         self.serializer = ProtocolSerializer()
-        self.target_reader: asyncio.StreamReader = None
-        self.target_writer: asyncio.StreamWriter = None
+        self.target_reader: Union[None, asyncio.StreamReader] = None
+        self.target_writer: Union[None, asyncio.StreamWriter] = None
         self.server_to_client_task = None
 
         self.logger = logging.getLogger('pyrdgw')
 
-    
     async def run(self):
         
         try:
@@ -63,14 +60,13 @@ class ProtocolStateMachine:
             msg = str(ex)
             self.logger.error(self.__msg_with_correlation_id(msg))
             
-            if self.server_to_client_task != None:
+            if self.server_to_client_task is not None:
                 await self.__close_target_connection()
 
             if self.websocket.open:
                 await self.__send_close_response_packet(ReturnCode.E_PROXY_INTERNALERROR)
                 await self.websocket.close()
                 await self.websocket.wait_closed()
-
 
     async def __handle_receiving_handshake_request(self):
 
@@ -80,10 +76,10 @@ class ProtocolStateMachine:
         self.__log_received_protocol_message(HttpPacketType.PKT_TYPE_HANDSHAKE_REQUEST)
 
         if handshake_request.ver_major != ProtocolVersion.VER_MAJOR:
-            raise Exception(LogMessages.PROTOCOL_INVALID_MAJOR_VERION)
+            raise Exception(LogMessages.PROTOCOL_INVALID_MAJOR_VERSION)
 
         if handshake_request.ver_minor != ProtocolVersion.VER_MINOR:
-            raise Exception(LogMessages.PROTOCOL_INVALID_MINOR_VERION)
+            raise Exception(LogMessages.PROTOCOL_INVALID_MINOR_VERSION)
 
         if handshake_request.extended_auth != HttpExtendedAuth.HTTP_EXTENDED_AUTH_PAA:
             raise Exception(LogMessages.PROTOCOL_INVALID_AUTHENTICATION_METHOD)
@@ -102,11 +98,13 @@ class ProtocolStateMachine:
 
         self.__transition_to_state(ProtocolState.RECEIVING_TUNNEL_CREATE)
 
-
     async def __handle_receiving_tunnel_create(self):
 
         recv_buf = await self.websocket.recv()
         tunnel_create = self.parser.read_tunnel_create(recv_buf)
+
+        # Do something with PAA cookie here
+        paa_cookie = tunnel_create.paa_cookie
 
         self.__log_received_protocol_message(HttpPacketType.PKT_TYPE_TUNNEL_CREATE)
 
@@ -124,7 +122,6 @@ class ProtocolStateMachine:
         await self.websocket.send(send_buf)
 
         self.__transition_to_state(ProtocolState.RECEIVING_TUNNEL_AUTHORIZE)
-
 
     async def __handle_receiving_tunnel_authorize(self):
 
@@ -150,7 +147,6 @@ class ProtocolStateMachine:
         await self.websocket.send(send_buf)
 
         self.__transition_to_state(ProtocolState.RECEIVING_CHANNEL_CREATE)
-
 
     async def __handle_receiving_channel_create(self):
 
@@ -194,10 +190,9 @@ class ProtocolStateMachine:
 
         self.__transition_to_state(ProtocolState.DATA_TRANSFER)
 
-
     async def __handle_data_transfer(self):
         
-        if self.server_to_client_task == None:
+        if self.server_to_client_task is None:
             self.server_to_client_task = asyncio.ensure_future(self.__forward_data_server_to_client())
 
         recv_buf = await self.websocket.recv()
@@ -213,24 +208,29 @@ class ProtocolStateMachine:
 
             self.__log_received_protocol_message(HttpPacketType.PKT_TYPE_CLOSE_CHANNEL)
             
-            if self.server_to_client_task != None:
+            if self.server_to_client_task is not None:
                 await self.__close_target_connection()
 
             await self.__send_close_response_packet(close_packet.status_code)
 
             self.__transition_to_state(ProtocolState.RECEIVING_CHANNEL_CREATE)
 
-
     async def __forward_data_server_to_client(self):
 
         while True:
-            data = await self.target_reader.read(65536)
+            buffer_length = 10240
+            data = await self.target_reader.read(buffer_length)
+            #if len(data) != buffer_length:
+            #    print(f"short data: {len(data)}")
+            if len(data) >= buffer_length:
+                print(f"exact data {buffer_length}")
+            #data = await self.target_reader.read()
             data_packet = DataPacket(data)
             send_buf = self.serializer.write_data_packet(data_packet)
             await self.websocket.send(send_buf)
 
-
     async def __close_target_connection(self):
+        logging.info("__close_target_connection")
 
         self.server_to_client_task.cancel()
         self.server_to_client_task = None
@@ -241,8 +241,8 @@ class ProtocolStateMachine:
         self.target_writer = None
         self.target_reader = None
 
-
     async def __send_close_response_packet(self, status_code: int):
+        logging.info("__send_close_response_packet")
 
         close_response_packet = CloseResponsePacket(status_code)
         send_buf = self.serializer.write_close_response_packet(close_response_packet)
@@ -251,7 +251,6 @@ class ProtocolStateMachine:
 
         await self.websocket.send(send_buf)
 
-
     def __transition_to_state(self, new_state: ProtocolState):
 
         msg = LogMessages.PROTOCOL_TRANSITION_STATE.format(self.state.name, new_state.name)
@@ -259,16 +258,13 @@ class ProtocolStateMachine:
 
         self.state = new_state
 
-
     def __log_received_protocol_message(self, packet_type: HttpPacketType):
         msg = LogMessages.PROTOCOL_RECEIVED_MESSAGE.format(packet_type.name)
         self.logger.debug(self.__msg_with_correlation_id(msg))
 
-
     def __log_sending_protocol_message(self, packet_type: HttpPacketType):
         msg = LogMessages.PROTOCOL_SENDING_MESSAGE.format(packet_type.name)
         self.logger.debug(self.__msg_with_correlation_id(msg))
-
 
     def __msg_with_correlation_id(self, msg: str):
         return self.rdg_correlation_id + ' - ' + msg

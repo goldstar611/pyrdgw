@@ -1,4 +1,3 @@
-
 from pyrdgw.protocol.messages import *
 from pyrdgw.protocol.enumerations import *
 from pyrdgw.util.streams import *
@@ -8,14 +7,13 @@ from pyrdgw.log_messages import *
 class ProtocolParser:
 
     def peek_packet_type(self, buf: bytes) -> int:
-        
+
         stream = ReadableStream(buf)
         packet_type = stream.peek_uint16()
         return packet_type
 
-    
     def read_handshake_request(self, buf: bytes) -> HandshakeRequest:
-        
+
         '''
         HTTP_HANDSHAKE_REQUEST_PACKET Structure:
 
@@ -56,9 +54,8 @@ class ProtocolParser:
         handshake_request = HandshakeRequest(ver_major, ver_minor, extended_auth)
         return handshake_request
 
-    
     def read_tunnel_create(self, buf: bytes) -> TunnelCreate:
-        
+
         '''
         HTTP_TUNNEL_PACKET Structure:
 
@@ -102,13 +99,14 @@ class ProtocolParser:
             raise Exception(LogMessages.PROTOCOL_INVALID_PACKET_LENGTH)
 
         paa_cookie = stream.read_bytes(paa_cookie_length)
+        # Convert to ascii and drop trailing \x00
+        paa_cookie = paa_cookie.decode("UTF-16-LE")[:-1]
 
         tunnel_create = TunnelCreate(caps_flags, fields_present, paa_cookie)
         return tunnel_create
 
-    
     def read_tunnel_authorize(self, buf: bytes) -> TunnelAuthorize:
-        
+
         '''
         HTTP_TUNNEL_AUTH_PACKET Structure:
 
@@ -142,7 +140,7 @@ class ProtocolParser:
         fields_present = stream.read_uint16()
 
         if fields_present != 0:
-            raise Exception(LogMessages.PROTOCOL_UNEXCPETED_FIELDS_TUNNEL_AUTH_OPTIONAL)
+            raise Exception(LogMessages.PROTOCOL_UNEXPECTED_FIELDS_TUNNEL_AUTH_OPTIONAL)
 
         client_name_length = stream.read_uint16()
 
@@ -154,9 +152,8 @@ class ProtocolParser:
         tunnel_authorize = TunnelAuthorize(fields_present, client_name)
         return tunnel_authorize
 
-    
     def read_channel_create(self, buf: bytes) -> ChannelCreate:
-        
+
         '''
         HTTP_CHANNEL_PACKET Structure:
 
@@ -191,7 +188,7 @@ class ProtocolParser:
         port = stream.read_uint16()
         protocol = stream.read_uint16()
 
-        if  protocol != 3:
+        if protocol != 3:
             raise Exception(LogMessages.PROTOCOL_INVALID_PROTOCOL_CHANNEL_CREATE)
 
         resources = list()
@@ -216,9 +213,8 @@ class ProtocolParser:
         channel_create = ChannelCreate(num_resources, num_alt_resources, port, resources, alt_resources)
         return channel_create
 
-
     def read_close_packet(self, buf: bytes) -> ClosePacket:
-        
+
         '''
         HTTP_CLOSE_PACKET Structure:
 
@@ -249,9 +245,8 @@ class ProtocolParser:
         close_packet = ClosePacket(status_code)
         return close_packet
 
-
     def read_data_packet(self, buf: bytes) -> DataPacket:
-        
+
         '''
         HTTP_DATA_PACKET Structure:
 

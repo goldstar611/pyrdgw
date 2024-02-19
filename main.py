@@ -28,7 +28,6 @@ def load_configuration():
     with open('config.json') as config_file:
         config = json.load(config_file)
 
-
     # Validate WebSocket server configuration
     
     if 'websocket_server' not in config:
@@ -51,27 +50,6 @@ def load_configuration():
     if 'ca_path' not in websocket_server_config:
         raise Exception(LogMessages.CONFIG_MISSING_KEY.format('websocket_server.ca_path'))
 
-    
-    # Validate gw server configuration
-    
-    if 'gw_server' not in config:
-        raise Exception(LogMessages.CONFIG_MISSING_KEY.format('gw_server'))
-
-    gw_server_config = config['gw_server']
-
-    if 'hostname' not in gw_server_config:
-        raise Exception(LogMessages.CONFIG_MISSING_KEY.format('gw_server.hostname'))
-
-    if 'port' not in gw_server_config:
-        raise Exception(LogMessages.CONFIG_MISSING_KEY.format('gw_server.port'))
-
-    if 'cert_path' not in gw_server_config:
-        raise Exception(LogMessages.CONFIG_MISSING_KEY.format('gw_server.cert_path'))
-
-    if 'key_path' not in gw_server_config:
-        raise Exception(LogMessages.CONFIG_MISSING_KEY.format('gw_server.key_path'))
-
-
     # Validate logging configuration
 
     if 'logging' not in config:
@@ -81,7 +59,6 @@ def load_configuration():
 
     if 'log_level' not in logging_config:
         raise Exception(LogMessages.CONFIG_MISSING_KEY.format('logging_config.log_level'))
-
 
     return config
 
@@ -99,13 +76,10 @@ if __name__ == '__main__':
         websocket_server = WebSocketServer(config)
         websocket_server.run()
 
-        gw_server = GWServer(config)
-        gw_server.run()
-
         loop = asyncio.get_event_loop()
         loop.run_forever()
 
     except Exception as ex:
         
-        if logger != None:
+        if logger is not None:
             logger.error(ex)

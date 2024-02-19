@@ -1,6 +1,7 @@
 
 import enum
 
+
 class ProtocolState(enum.IntEnum):
     INITIAL = 0
     RECEIVING_HANDSHAKE_REQUEST = 1
