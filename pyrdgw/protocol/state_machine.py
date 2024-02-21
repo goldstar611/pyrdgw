@@ -53,7 +53,7 @@ class ProtocolStateMachine:
                     await self.__handle_data_transfer()
 
                 else:
-                    pass
+                    logging.error("Invalid state detected")
 
         except Exception as ex:
 
@@ -160,6 +160,8 @@ class ProtocolStateMachine:
 
         connected = False
         for resource in channel_create.resources:
+
+            # Authorize resource here
 
             try:
                 self.target_reader, self.target_writer = await asyncio.open_connection(
