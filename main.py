@@ -1,6 +1,5 @@
 
 from pyrdgw.server.websocket_server import *
-from pyrdgw.server.gw_server import *
 
 import logging
 import json
